@@ -10,6 +10,7 @@ find_package(glfw3 REQUIRED)
 
 add_subdirectory(dependencies/cglm)
 
-add_executable(chess main.c)
+
+add_executable(chess src/main.c)
 
 target_link_libraries(chess OpenGL::GL glfw GLEW::glew cglm)

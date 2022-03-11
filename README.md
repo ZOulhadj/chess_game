@@ -5,3 +5,4 @@
 * [cglm](https://github.com/recp/cglm)
 * [glew](https://github.com/nigels-com/glew)
 * [glfw](https://github.com/glfw/glfw)
+* [stb_image](https://github.com/nothings/stb)
