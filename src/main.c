@@ -169,9 +169,9 @@ int main(void)
     glDeleteShader(fragment_shader);
 
     // example texture
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    unsigned int white_tile_texture;
+    glGenTextures(1, &white_tile_texture);
+    glBindTexture(GL_TEXTURE_2D, white_tile_texture);
     // texture wrapping
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -179,23 +179,45 @@ int main(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    int width, height, nr_channels;
+    int width1, height1, nr_channels1;
     stbi_set_flip_vertically_on_load(1);
-    unsigned char *data = stbi_load("assets/wall.jpg", &width, &height, &nr_channels, 0);
+    unsigned char *data = stbi_load("assets/white_tile.jpg", &width1, &height1, &nr_channels1, 0);
     if (!data) {
         printf("Error: failed to load texture\n");
         glfwTerminate();
         return -1;
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width1, height1, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(data);
 
-    glUseProgram(shader);
-    glUniform1i(glGetUniformLocation(shader, "texture1"), 0);
 
+    unsigned int black_tile_texture;
+    glGenTextures(1, &black_tile_texture);
+    glBindTexture(GL_TEXTURE_2D, black_tile_texture);
+    // texture wrapping
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // texture filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    int width2, height2, nr_channels2;
+    unsigned char *data1 = stbi_load("assets/black_tile.jpg", &width2, &height2, &nr_channels2, 0);
+    if (!data1) {
+        printf("Error: failed to load texture\n");
+        glfwTerminate();
+        return -1;
+    }
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width2, height2, 0, GL_RGB, GL_UNSIGNED_BYTE, data1);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    //glUseProgram(shader);
+    //glUniform1i(glGetUniformLocation(shader, "texture1"), 0);
+    //glUniform1i(glGetUniformLocation(shader, "texture1"), 0);
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window)) {
@@ -203,8 +225,7 @@ int main(void)
         glClear(GL_COLOR_BUFFER_BIT);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
+
 
         mat4 view_projection_matrix;
         glm_ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, view_projection_matrix);
@@ -216,13 +237,25 @@ int main(void)
                 mat4 transform;
                 glm_mat4_identity(transform);
 
-                float ve = 0.5f / ((float)tile_count / 2.0f);
-                vec2 position = { (float)x / ((float)tile_count / 2.0f) + ve, (float)y / ((float)tile_count / 2.0f) + ve };
+                // tile translations
+                float center = 0.5f / ((float)tile_count / 2.0f);
+                vec2 position = { (float)x / ((float)tile_count / 2.0f) + center, (float)y / ((float)tile_count / 2.0f) + center };
                 glm_translate(transform, position);
-                //glm_rotate(transform, -(float)glfwGetTime(), (vec3){0.0f, 0.0f, 1.0f});
 
                 float scale = 1.0f / ((float)tile_count / 2);
                 glm_scale_uni(transform, scale);
+
+
+                // board texture toggling
+                if (y % 2 != 0) {
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, x % 2 == 0 ? white_tile_texture : black_tile_texture);
+                } else {
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, x % 2 == 0 ? black_tile_texture : white_tile_texture);
+                }
+
+
 
                 glUseProgram(shader);
                 glUniformMatrix4fv(glGetUniformLocation(shader, "view_projection"), 1, GL_FALSE, &view_projection_matrix[0][0]);
