@@ -247,12 +247,13 @@ int main(void)
     int tile_count = 8;
     vec2 tile_positions[tile_count][tile_count];
 
-    float center = 0.5f / ((float)tile_count / 2.0f);
+
 
     assert(tile_count == 8);
 
     unsigned int x_index = 0;
     unsigned int y_index = 0;
+    float center = 0.5f / ((float)tile_count / 2.0f);
     for (int y = -tile_count / 2; y < tile_count / 2; ++y, ++y_index, x_index = 0) {
         for (int x = -tile_count / 2; x < tile_count / 2; ++x, ++x_index) {
             vec2 position = { (float)x / ((float)tile_count / 2.0f) + center, (float)y / ((float)tile_count / 2.0f) + center };
@@ -263,7 +264,7 @@ int main(void)
 
     // set chess pieces starting position
     unsigned int piece_positions[tile_count][tile_count];
-    memset(piece_positions, -1, tile_count * tile_count);
+    memset(piece_positions, -1, sizeof(piece_positions));
     piece_positions[0][0] = white_rook_texture;
     piece_positions[1][0] = white_knight_texture;
     piece_positions[2][0] = white_bishop_texture;
@@ -343,8 +344,8 @@ int main(void)
 
 
                 // render chess pieces
-                if (piece_positions[x][y] != 0) {
-                    //glm_scale_uni(transform, tile_scale);
+                if (piece_positions[x][y] != -1) {
+                    glm_scale_uni(transform, 0.8f);
                     render_texture(piece_positions[x][y], shader, view_projection_matrix, transform);
                 }
 
@@ -356,6 +357,10 @@ int main(void)
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+
+
+
 
     glDeleteTextures(1, &black_pawn_texture);
     glDeleteTextures(1, &black_rook_texture);
@@ -384,6 +389,7 @@ int main(void)
     glDeleteVertexArrays(1, &quad_vao);
 
     glfwTerminate();
+
     return 0;
 }
 
