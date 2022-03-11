@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <cglm/vec2.h>
 #include <cglm/vec3.h>
 #include <cglm/affine.h>
 #include <cglm/mat4.h>
@@ -22,9 +24,59 @@ struct vertex {
     vec2 texture_coordinate;
 };
 
-
 int window_width  = 720;
 int window_height = 720;
+
+
+
+void set_shader_mat4(unsigned int shader, const char *name, mat4 value)
+{
+    glUniformMatrix4fv(glGetUniformLocation(shader, name), 1, GL_FALSE, &value[0][0]);
+}
+
+
+unsigned int load_texture(const char *path)
+{
+    unsigned int id;
+
+    glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_2D, id);
+
+    // texture wrapping
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // texture filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int width, height, nr_channels;
+    unsigned char *data = stbi_load(path, &width, &height, &nr_channels, 0);
+    if (!data) {
+        printf("Failed to load texture: %s\n", path);
+        return -1;
+    }
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(data);
+
+    return id;
+}
+
+
+void render_texture(unsigned int id, unsigned int shader, mat4 view_projection, mat4 model)
+{
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, id);
+
+    set_shader_mat4(shader, "view_projection", view_projection);
+    set_shader_mat4(shader, "model", model);
+
+
+
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
 
 int main(void)
 {
@@ -63,7 +115,9 @@ int main(void)
         return -1;
     }
 
-
+    // enable texture transparency
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     struct vertex vertices[4] = {
             { 0.5f, 0.5f, 0.0f,    1.0f, 1.0f },
@@ -168,56 +222,82 @@ int main(void)
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
-    // example texture
-    unsigned int white_tile_texture;
-    glGenTextures(1, &white_tile_texture);
-    glBindTexture(GL_TEXTURE_2D, white_tile_texture);
-    // texture wrapping
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // texture filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    int width1, height1, nr_channels1;
     stbi_set_flip_vertically_on_load(1);
-    unsigned char *data = stbi_load("assets/white_tile.jpg", &width1, &height1, &nr_channels1, 0);
-    if (!data) {
-        printf("Error: failed to load texture\n");
-        glfwTerminate();
-        return -1;
+    // chess board tiles
+    unsigned int white_tile_texture  = load_texture("assets/pack/PNGs/no_shadow/1024h/square_brown_light_png_1024px.png");
+    unsigned int black_tile_texture  = load_texture("assets/pack/PNGs/no_shadow/1024h/square_gray_light_png_1024px.png");
+
+    unsigned int white_king_texture   = load_texture("assets/pack/PNGs/no_shadow/1024h/w_king_png_1024px.png");
+    unsigned int white_queen_texture  = load_texture("assets/pack/PNGs/no_shadow/1024h/w_queen_png_1024px.png");
+    unsigned int white_bishop_texture = load_texture("assets/pack/PNGs/no_shadow/1024h/w_bishop_png_1024px.png");
+    unsigned int white_knight_texture = load_texture("assets/pack/PNGs/no_shadow/1024h/w_knight_png_1024px.png");
+    unsigned int white_rook_texture   = load_texture("assets/pack/PNGs/no_shadow/1024h/w_rook_png_1024px.png");
+    unsigned int white_pawn_texture   = load_texture("assets/pack/PNGs/no_shadow/1024h/w_pawn_png_1024px.png");
+
+    unsigned int black_king_texture   = load_texture("assets/pack/PNGs/no_shadow/1024h/b_king_png_1024px.png");
+    unsigned int black_queen_texture  = load_texture("assets/pack/PNGs/no_shadow/1024h/b_queen_png_1024px.png");
+    unsigned int black_bishop_texture = load_texture("assets/pack/PNGs/no_shadow/1024h/b_bishop_png_1024px.png");
+    unsigned int black_knight_texture = load_texture("assets/pack/PNGs/no_shadow/1024h/b_knight_png_1024px.png");
+    unsigned int black_rook_texture   = load_texture("assets/pack/PNGs/no_shadow/1024h/b_rook_png_1024px.png");
+    unsigned int black_pawn_texture   = load_texture("assets/pack/PNGs/no_shadow/1024h/b_pawn_png_1024px.png");
+
+
+    // build chess board
+    int tile_count = 8;
+    vec2 tile_positions[tile_count][tile_count];
+
+    float center = 0.5f / ((float)tile_count / 2.0f);
+
+    assert(tile_count == 8);
+
+    unsigned int x_index = 0;
+    unsigned int y_index = 0;
+    for (int y = -tile_count / 2; y < tile_count / 2; ++y, ++y_index, x_index = 0) {
+        for (int x = -tile_count / 2; x < tile_count / 2; ++x, ++x_index) {
+            vec2 position = { (float)x / ((float)tile_count / 2.0f) + center, (float)y / ((float)tile_count / 2.0f) + center };
+            glm_vec2(position, tile_positions[x_index][y_index]);
+        }
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width1, height1, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
 
-    stbi_image_free(data);
+    // set chess pieces starting position
+    unsigned int piece_positions[tile_count][tile_count];
+    memset(piece_positions, -1, tile_count * tile_count);
+    piece_positions[0][0] = white_rook_texture;
+    piece_positions[1][0] = white_knight_texture;
+    piece_positions[2][0] = white_bishop_texture;
+    piece_positions[3][0] = white_queen_texture;
+    piece_positions[4][0] = white_king_texture;
+    piece_positions[5][0] = white_bishop_texture;
+    piece_positions[6][0] = white_knight_texture;
+    piece_positions[7][0] = white_rook_texture;
+    piece_positions[0][1] = white_pawn_texture;
+    piece_positions[1][1] = white_pawn_texture;
+    piece_positions[2][1] = white_pawn_texture;
+    piece_positions[3][1] = white_pawn_texture;
+    piece_positions[4][1] = white_pawn_texture;
+    piece_positions[5][1] = white_pawn_texture;
+    piece_positions[6][1] = white_pawn_texture;
+    piece_positions[7][1] = white_pawn_texture;
 
 
-    unsigned int black_tile_texture;
-    glGenTextures(1, &black_tile_texture);
-    glBindTexture(GL_TEXTURE_2D, black_tile_texture);
-    // texture wrapping
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // texture filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-    int width2, height2, nr_channels2;
-    unsigned char *data1 = stbi_load("assets/black_tile.jpg", &width2, &height2, &nr_channels2, 0);
-    if (!data1) {
-        printf("Error: failed to load texture\n");
-        glfwTerminate();
-        return -1;
-    }
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width2, height2, 0, GL_RGB, GL_UNSIGNED_BYTE, data1);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    //glUseProgram(shader);
-    //glUniform1i(glGetUniformLocation(shader, "texture1"), 0);
-    //glUniform1i(glGetUniformLocation(shader, "texture1"), 0);
+    piece_positions[0][7] = black_rook_texture;
+    piece_positions[1][7] = black_knight_texture;
+    piece_positions[2][7] = black_bishop_texture;
+    piece_positions[3][7] = black_queen_texture;
+    piece_positions[4][7] = black_king_texture;
+    piece_positions[5][7] = black_bishop_texture;
+    piece_positions[6][7] = black_knight_texture;
+    piece_positions[7][7] = black_rook_texture;
+    piece_positions[0][6] = black_pawn_texture;
+    piece_positions[1][6] = black_pawn_texture;
+    piece_positions[2][6] = black_pawn_texture;
+    piece_positions[3][6] = black_pawn_texture;
+    piece_positions[4][6] = black_pawn_texture;
+    piece_positions[5][6] = black_pawn_texture;
+    piece_positions[6][6] = black_pawn_texture;
+    piece_positions[7][6] = black_pawn_texture;
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window)) {
@@ -225,50 +305,78 @@ int main(void)
         glClear(GL_COLOR_BUFFER_BIT);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-
-
         mat4 view_projection_matrix;
         glm_ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, view_projection_matrix);
 
-        // chess grid
-        int tile_count = 8;
-        for (int y = -tile_count / 2; y < tile_count / 2; ++y) {
-            for (int x = -tile_count / 2; x < tile_count / 2; ++x) {
+        glUseProgram(shader);
+        glBindVertexArray(quad_vao);
+
+        // render chess board
+        for (int y = 0; y < tile_count; ++y) {
+            for (int x = 0; x < tile_count; ++x) {
+                float tile_scale = 1.0f / ((float)tile_count / 2.0f);
+                //float piece_scale = tile_scale + 0.4f;
                 mat4 transform;
                 glm_mat4_identity(transform);
 
-                // tile translations
-                float center = 0.5f / ((float)tile_count / 2.0f);
-                vec2 position = { (float)x / ((float)tile_count / 2.0f) + center, (float)y / ((float)tile_count / 2.0f) + center };
-                glm_translate(transform, position);
-
-                float scale = 1.0f / ((float)tile_count / 2);
-                glm_scale_uni(transform, scale);
+                glm_translate(transform, tile_positions[x][y]);
+                glm_scale_uni(transform, tile_scale);
 
 
-                // board texture toggling
                 if (y % 2 != 0) {
                     glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, x % 2 == 0 ? white_tile_texture : black_tile_texture);
+                    glBindTexture(GL_TEXTURE_2D, x % 2 == 0 ? black_tile_texture : white_tile_texture);
                 } else {
                     glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, x % 2 == 0 ? black_tile_texture : white_tile_texture);
+                    glBindTexture(GL_TEXTURE_2D, x % 2 == 0 ? white_tile_texture : black_tile_texture);
                 }
 
 
+                set_shader_mat4(shader, "view_projection", view_projection_matrix);
+                set_shader_mat4(shader, "model", transform);
 
-                glUseProgram(shader);
-                glUniformMatrix4fv(glGetUniformLocation(shader, "view_projection"), 1, GL_FALSE, &view_projection_matrix[0][0]);
-                glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &transform[0][0]);
-
-                glBindVertexArray(quad_vao);
                 glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+
+
+
+
+
+                // render chess pieces
+                if (piece_positions[x][y] != 0) {
+                    //glm_scale_uni(transform, tile_scale);
+                    render_texture(piece_positions[x][y], shader, view_projection_matrix, transform);
+                }
+
             }
         }
+
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    glDeleteTextures(1, &black_pawn_texture);
+    glDeleteTextures(1, &black_rook_texture);
+    glDeleteTextures(1, &black_knight_texture);
+    glDeleteTextures(1, &black_bishop_texture);
+    glDeleteTextures(1, &black_queen_texture);
+    glDeleteTextures(1, &black_king_texture);
+
+    glDeleteTextures(1, &white_pawn_texture);
+    glDeleteTextures(1, &white_rook_texture);
+    glDeleteTextures(1, &white_knight_texture);
+    glDeleteTextures(1, &white_bishop_texture);
+    glDeleteTextures(1, &white_queen_texture);
+    glDeleteTextures(1, &white_king_texture);
+
+    glDeleteTextures(1, &black_tile_texture);
+    glDeleteTextures(1, &white_tile_texture);
+
+
+
+    glDeleteShader(shader);
 
 
     glDeleteBuffers(1, &quad_ebo);
