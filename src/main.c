@@ -18,6 +18,7 @@
 void glfw_error_callback(int code, const char *description);
 void glfw_window_resize_callback(GLFWwindow *window, int width, int height);
 void glfw_framebuffer_callback(GLFWwindow *window, int width, int height);
+void glfw_mouse_position_callback(GLFWwindow *window, double xpos, double ypos);
 
 struct vertex {
     vec3 position;
@@ -27,7 +28,7 @@ struct vertex {
 int window_width  = 720;
 int window_height = 720;
 
-
+vec2 mouse_position;
 
 void set_shader_mat4(unsigned int shader, const char *name, mat4 value)
 {
@@ -107,6 +108,7 @@ int main(void)
     glfwMakeContextCurrent(window);
     glfwSetWindowSizeCallback(window, glfw_window_resize_callback);
     glfwSetFramebufferSizeCallback(window, glfw_framebuffer_callback);
+    glfwSetCursorPosCallback(window, glfw_mouse_position_callback);
     glfwSetWindowAspectRatio(window, 1, 1);
 
     glewExperimental = 1;
@@ -339,6 +341,10 @@ int main(void)
                 glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 
+                // cursor ray casting
+
+
+
 
                 // update chess pieces
 
@@ -348,6 +354,7 @@ int main(void)
                     glm_scale_uni(transform, 0.8f);
                     render_texture(piece_positions[x][y], shader, view_projection_matrix, transform);
                 }
+
 
             }
         }
@@ -407,4 +414,9 @@ void glfw_window_resize_callback(GLFWwindow *window, int width, int height)
 void glfw_framebuffer_callback(GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+void glfw_mouse_position_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    glm_vec2((vec2){ (float)xpos, (float)ypos }, mouse_position);
 }
