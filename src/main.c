@@ -107,7 +107,7 @@ int main(void)
     glfwMakeContextCurrent(window);
     glfwSetWindowSizeCallback(window, glfw_window_resize_callback);
     glfwSetFramebufferSizeCallback(window, glfw_framebuffer_callback);
-
+    glfwSetWindowAspectRatio(window, 1, 1);
 
     glewExperimental = 1;
     if (glewInit() != GLEW_OK) {
@@ -340,7 +340,7 @@ int main(void)
 
 
 
-
+                // update chess pieces
 
 
                 // render chess pieces
